@@ -44,11 +44,15 @@ document.addEventListener('DOMContentLoaded', () => {
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const nameRegex = /^[а-яА-ЯёЁa-zA-Z\s\-]+$/;
 
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+// Куда уходит форма (Web3Forms — бесплатный сервис для статических сайтов)
+const WEB3FORMS_ENDPOINT = 'https://api.web3forms.com/submit';
+
+// Человекочитаемые темы письма
+const SUBJECT_LABELS = {
+    collaboration: 'Сотрудничество',
+    job: 'Работа',
+    other: 'Другое'
+};
 
 function showError(fieldId, message) {
     const errorEl = document.getElementById(`${fieldId}-error`);
@@ -147,40 +151,79 @@ function validateForm(form) {
     return isValid;
 }
 
-// Обработка отправки формы
-function handleFormSubmit(e) {
-    e.preventDefault();
-    
-    const form = e.target;
-    const successEl = document.getElementById('form-success');
-    
-    if (!validateForm(form)) {
-        successEl.classList.remove('show');
-        successEl.textContent = '';
+// Сообщение под формой: успех — зелёное, ошибка — красное
+function showFormMessage(text, isError) {
+    const messageEl = document.getElementById('form-success');
+    if (!messageEl) {
         return;
     }
-    
-    // Санитизация и сбор данных (для демонстрации)
-    const formData = {
-        name: escapeHtml(form.querySelector('#name').value.trim()),
-        email: escapeHtml(form.querySelector('#email').value.trim()),
-        subject: form.querySelector('#subject').value,
-        message: escapeHtml(form.querySelector('#message').value.trim())
-    };
-    
-    // В реальном приложении здесь была бы отправка на сервер
-    console.log('Данные формы (sanitized):', formData);
-    
-    // Показываем успешное сообщение.
-    // Пользовательские данные подставляются через textContent, а не innerHTML,
-    // поэтому любые HTML-теги из ввода не исполняются (защита от XSS).
-    successEl.textContent = 'Спасибо, ' + formData.name +
-        '! Сообщение получено (демонстрация, отправка на сервер не выполняется).';
-    successEl.classList.add('show');
-    
-    // Очищаем форму
-    form.reset();
-    ['name', 'email', 'message'].forEach(clearError);
+    // Через textContent, а не innerHTML: текст ответа не может выполнить скрипт
+    messageEl.textContent = text;
+    messageEl.classList.toggle('error', Boolean(isError));
+    messageEl.classList.add('show');
+}
+
+function hideFormMessage() {
+    const messageEl = document.getElementById('form-success');
+    if (!messageEl) {
+        return;
+    }
+    messageEl.textContent = '';
+    messageEl.classList.remove('show', 'error');
+}
+
+// Отправка формы на Web3Forms без перезагрузки страницы
+async function sendForm(form) {
+    const payload = Object.fromEntries(new FormData(form).entries());
+    payload.subject = 'Сообщение с сайта: ' + (SUBJECT_LABELS[payload.subject] || 'без темы');
+
+    const response = await fetch(WEB3FORMS_ENDPOINT, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json'
+        },
+        body: JSON.stringify(payload)
+    });
+
+    return response.json();
+}
+
+// Обработка отправки формы
+async function handleFormSubmit(e) {
+    e.preventDefault();
+
+    const form = e.target;
+    const submitBtn = form.querySelector('button[type="submit"]');
+
+    hideFormMessage();
+
+    if (!validateForm(form)) {
+        return;
+    }
+
+    // Блокируем кнопку, чтобы сообщение не ушло дважды
+    if (submitBtn) {
+        submitBtn.disabled = true;
+    }
+
+    try {
+        const result = await sendForm(form);
+
+        if (result.success) {
+            showFormMessage('Сообщение отправлено!', false);
+            form.reset();
+            ['name', 'email', 'message'].forEach(clearError);
+        } else {
+            showFormMessage('Ошибка, попробуйте позже', true);
+        }
+    } catch {
+        showFormMessage('Ошибка, попробуйте позже', true);
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+        }
+    }
 }
 
 // Инициализация формы

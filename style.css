@@ -187,12 +187,18 @@ body {
     color: var(--accent-color);
 }
 
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
 /* ==========================================================================
    7. Секция проектов
    ========================================================================== */
 .projects h3,
 .skills h3,
-.education-section h3 {
+.work-section h3 {
     margin-bottom: 25px;
 }
 
@@ -403,6 +409,15 @@ body {
 
 .form-success.show {
     display: block;
+}
+
+.form-success.error {
+    background-color: var(--error-color);
+}
+
+/* Honeypot: скрыто от людей, но спам-боты его заполняют */
+.botcheck {
+    display: none;
 }
 
 .form-group:last-of-type {
